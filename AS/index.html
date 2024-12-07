@@ -1,0 +1,234 @@
+<!doctype html> 
+<html lang="en"> 
+<head> 
+    <meta charset="UTF-8" />
+    <title>Asteroid Shooter</title>
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.11.0/dist/phaser.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+<script type="text/javascript">
+
+const vw = window.innerWidth;
+const vh = window.innerHeight;
+const config = {
+    type: Phaser.AUTO,
+    width: vw,
+    height: vh,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 0 },  
+            debug: false
+        }
+    },
+    scene: {
+        preload: preload,
+        create: create,
+        update: update
+    }
+};
+
+const game = new Phaser.Game(config);
+
+let player;
+let cursors;
+let laserGroup;
+let asteroids;
+let lastShotTime = 0;
+let bulletTime = 300;
+let score = 0;
+let scoreText;
+let gameOverText;
+let healthBar;
+let count = 5;
+let speed = 200;
+let asteroidSpeed = 200;
+function preload() {
+    // Load images for player, bullet, and asteroid
+    this.load.image('player', 'assets/player.png');
+    this.load.image('asteroid', 'assets/asteroid.png');
+    this.load.image('laser', 'assets/laser.png'); // Load laser image
+}
+
+function create() {
+    // Create player with physics
+    enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+    player = this.physics.add.image(400, 300, 'player');
+    player.setCollideWorldBounds(true);
+    player.setOrigin(0.5, 0.5);
+    player.setScale(0.2); // Resize player image to 50%
+
+    // Set low gravity for the player
+    player.setGravityY(100); // You can adjust the gravity force (default is 300)
+
+    // Create a group for lasers
+    laserGroup = new LaserGroup(this);
+
+    // Create a group for asteroids
+    asteroids = this.physics.add.group();
+
+    // Create initial asteroids
+    createAsteroid(count, speed);
+
+    // Setup controls
+    cursors = this.input.keyboard.createCursorKeys();
+
+    // Create score display
+    scoreText = this.add.text(16, 16, 'Score: 0', {
+        fontSize: '32px',
+        fill: '#fff'
+    });
+    this.physics.add.collider(laserGroup, asteroids, (laser, asteroid) => {
+    if (!laser.active || !asteroid.active) {
+        return; 
+    }
+    destroyAsteroid(laser, asteroid);
+}, null, this);
+
+    // setTimeout(() => {
+    //     // Ensure that `player` and `asteroids` exist and are valid before adding the collider
+    //     if (player.active && asteroids.countActive(true) > 0) {
+    //         this.physics.add.collider(player, asteroids, gameOver, null, this);
+    //     }
+    // }, 3000);
+}
+
+function update(time, delta) {
+    let speed = 200;
+    if (cursors.left.isDown) {
+        player.angle = player.angle - 3;
+    } else if (cursors.right.isDown) {
+        player.angle = player.angle + 3;
+    } 
+   
+    
+
+    if (cursors.up.isDown) {
+        let radianAngle = Phaser.Math.DegToRad(player.angle - 90);
+        player.setVelocityX(Math.cos(radianAngle) * speed);
+        player.setVelocityY(Math.sin(radianAngle) * speed);
+    } else if (cursors.down.isDown) {
+        let radianAngle = Phaser.Math.DegToRad(player.angle - 90);
+        player.setVelocityX(-Math.cos(radianAngle) * speed/2);
+        player.setVelocityY(-Math.sin(radianAngle) * speed/2);    } 
+    
+    // Shooting
+    if (Phaser.Input.Keyboard.JustDown(cursors.space) && time > lastShotTime + bulletTime) {
+        shootLaser();
+        lastShotTime = time;
+    }
+    if(enterKey.isDown){
+        count++;
+        speed = speed *1.5;
+        createAsteroid(count, speed);
+    }
+    if(asteroids.children.entries.length == 0){
+        speed= speed*1.5;
+        count = count*2;
+        createAsteroid(count,speed);
+    }
+    
+    
+}
+function gameOver(){
+   
+
+}
+function shootLaser() {
+    laserGroup.fireLaser(player.x, player.y - 20); 
+}
+
+function destroyAsteroid(laser, asteroid) {
+    if (!asteroid.active || !laser.active) {
+        return; // Skip if either object is not active
+    }
+    console.log("destory asteroid");
+    // Deactivate the specific asteroid and laser involved in the collision
+    asteroid.destroy();
+    laser.destroy();
+    // Update the score
+    score += 10;
+    scoreText.setText('Score: ' + score);
+
+    // Respawn the specific asteroid after a delay
+    
+}
+function createAsteroid(count, speed){
+    for (let i = 0; i < count; i++) {
+            let asteroid = asteroids.create(Phaser.Math.Between(100, 700), Phaser.Math.Between(100, 500), 'asteroid');
+            asteroid.setBounce(1);
+            asteroid.setCollideWorldBounds(true);
+            asteroid.setVelocity(Phaser.Math.Between(-200, 200), Phaser.Math.Between(-200, 200));
+            asteroid.setScale(0.3); 
+        }
+}
+class LaserGroup extends Phaser.Physics.Arcade.Group {
+    constructor(scene) {
+        super(scene.physics.world, scene);
+        this.maxLasers = 30;  // Maximum lasers to start with
+        this.laserIncrement = 10;  // How many new lasers to create when the pool is exhausted
+        this.createLasers(this.maxLasers);  // Initial laser pool creation
+        
+        
+    }
+
+    
+    createLasers(count) {
+        this.createMultiple({
+            classType: Laser,
+            frameQuantity: count,
+            active: false,
+            visible: false,
+            key: 'laser',
+            setXY: { x: -100, y: -100 } 
+        });
+    }
+
+    // Fire a laser
+    fireLaser(x, y) {
+        let laser = this.getFirstDead(false);
+        
+        // If no dead lasers, expand the pool
+        if (!laser) {
+            console.log('Expanding laser pool');
+            this.createLasers(this.laserIncrement);  // Create additional lasers
+            laser = this.getFirstDead(false);  // Try to get a new one after expanding the pool
+        }
+
+        if (laser) {
+            laser.fire(x, y);  // Fire the laser
+        }
+    }
+}
+
+
+// Laser Class
+class Laser extends Phaser.Physics.Arcade.Sprite {
+    constructor(scene, x, y) {
+        super(scene, x, y, 'laser');
+        scene.add.existing(this); // Add the laser to the scene
+        scene.physics.world.enable(this); // Enable physics on the laser
+    }
+
+    fire(x, y) {
+        this.setPosition(x, y);
+        this.setActive(true);
+        this.setVisible(true);
+        let radianAngle = Phaser.Math.DegToRad(player.angle -90);
+        this.setScale(.05);
+        this.angle = player.angle -90;
+        this.setVelocityX(Math.cos(radianAngle) * 800);
+        this.setVelocityY(Math.sin(radianAngle) * 800);
+    }
+}
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,35 @@
+body {
+    background-image: url('back.png');
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    background-size: cover
+  }
+
+h1{
+    font-weight: bold;
+    font-size: 0.85em;
+    text-align: center;
+    color: red;
+    padding: 4.2em;
+    font-family:'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+
+}
+
+ul{
+    padding: 3.5em;
+    padding-top: 5em;
+}
+
+li{
+    font-weight: bold;
+    font-size: 1.5em;
+    font-family:'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Verdana, sans-serif;
+    padding: 0.5em;
+    text-align: center;
+    
+}
+
+a{
+    color: #00bb00;
+    text-decoration: none;
+}
